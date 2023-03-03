@@ -247,6 +247,8 @@ class neural_network:
 nn = neural_network(784)
 nn.fit_neural_network(xtrain,ytrain_oh, epochs = 1, optimizer = 'GD')
 
+## Lets go debug mode.
+
 
 
 
