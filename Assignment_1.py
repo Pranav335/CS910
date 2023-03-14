@@ -10,16 +10,19 @@ import numpy as np
 import pdb
 from sklearn.preprocessing import OneHotEncoder
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+
 
 import wandb
 
-# wandb.login()
+wandb.login()
 
 (xtrain, ytrain), (xtest, ytest) = fashion_mnist.load_data()
 
 # Extract unique labels from the dataset for visualization
 
-yunique , index = np.unique(ytrain[:100], return_index = True)
+yunique, index = np.unique(ytrain[:100], return_index = True)
 
 labels = ['Tshirts', 'Trouser', 'Pullover',
           'Dress', 'Coat', 'Sandal', 'Shirt',
@@ -51,6 +54,7 @@ ytest_oh = encoder.fit_transform(ytest.reshape(-1,1))
 ytrain_oh = ytrain_oh.toarray()
 ytest_oh = ytest_oh.toarray()
 
+# Define sweep configuration
 
 class neural_network:
 
@@ -119,7 +123,7 @@ class neural_network:
 
     return self.H[self.L+1] 
 
-  def grad_sigmoid(self,x):
+  def grad_sigmoid(self, x):
     return x * (1 - x)
 
   def gradient(self, x, y):
@@ -198,17 +202,18 @@ class neural_network:
 
 
 
-  def fit_neural_network(self,X, Y, epochs = 10, lr = 0.01,
+  def fit_neural_network(self,X, Y, epochs = 10, lr = 0.00001,
                          batch_size = 40,
                          optimizer = 'GD', beta = 0.05,
-                         eps = 1e-5):
+                         eps = 1e-5, train_plot = False):
+    
   
     loss = []                          
 
     n_samples = X.shape[0]
     train_accuracy = []
     # Training the model.
-    for i in range(epochs):
+    for i in tqdm(range(epochs), desc = 'Epochs'):
       epoch_loss = 0
       if optimizer == 'GD':
         self.gradient_descent(X,Y, lr = lr, batch_size = batch_size)
@@ -219,12 +224,26 @@ class neural_network:
       
       loss.append(epoch_loss/n_samples)
       train_accuracy.append(self.accuracy(X, Y))
+      
+      # if i > 10:
+      #     plt.figure()
+      #     plt.plot([*range(i)], loss, label = 'Loss')
+      #     plt.plot([*range(i)], train_accuracy, label = 'Accuracy')
+      #     plt.xlabel('Epochs')
+      #     plt.ylabel('Loss')
+      #     plt.legend()
+          
+   
+          
     # Plotting the loss
-    plt.plot([*range(epochs)], loss, label = 'Loss')
-    plt.plot([*range(epochs)], train_accuracy, label = 'Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
+    # if train_plot == True:
+    #     plt.plot([*range(epochs)], loss, label = 'Loss')
+    #     plt.plot([*range(epochs)], train_accuracy, label = 'Accuracy')
+    #     plt.xlabel('Epochs')
+    #     plt.ylabel('Loss')
+    #     plt.legend()
+    
+    return epoch_loss
 
 
 
@@ -244,9 +263,31 @@ class neural_network:
       
 
 
-nn = neural_network(784)
-nn.fit_neural_network(xtrain,ytrain_oh, epochs = 1, optimizer = 'GD')
+sweep_configuration = {'method': 'random',
+                       'name': 'sweep',
+                       'metric': {'goal': 'minimize', 'name': 'epoch_loss'},
+                       'parameters':
+                           {
+                             'batch_size': {'values':[16, 32, 64]},
+                             'epochs': {'values': [20, 30, 40]},
+                             'lr': {'values': [1e-10,1e-7, 1e-5, 1e-3]}
+                             }
+    }
+    
 
+def wandbsweeps():
+    wandb.init(project = 'CS6910-Assignment-1')
+    nn = neural_network(784)
+    epoch_loss = nn.fit_neural_network(xtrain, ytrain_oh, lr = wandb.config.lr,
+                                       epochs = wandb.config.epochs,
+                                       batch_size = wandb.config.batch_size)
+    wandb.log({'epoch_loss': epoch_loss})
+
+nn = neural_network(784)
+#epoch_loss = nn.fit_neural_network(xtrain, ytrain_oh, epochs = 50, optimizer = 'GD')
+
+sweep_id = wandb.sweep(sweep= sweep_configuration, project = 'CS6910-Assignment-1')
+wandb.agent(sweep_id, function = wandbsweeps, count = 10)
 ## Lets go debug mode.
 ## Lets do another debug
 
